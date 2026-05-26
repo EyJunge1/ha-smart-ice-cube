@@ -1,0 +1,240 @@
+blueprint:
+  name: HA Smart Ice Cube
+  description: >
+    Steuert eine Eiswürfelmaschine über Smart Plug, Power-Sensor und Fingerbot.
+    Ein-/Ausschalten via Home Assistant App, HomeKit (input_boolean) oder physischem
+    Touch am Fingerbot. Der Power-Sensor erkennt den echten Maschinenstatus.
+  domain: automation
+  source_url: https://github.com/EyJunge1/ha-smart-ice-cube
+  author: Arne Leder
+  homeassistant:
+    min_version: "2024.1.0"
+  input:
+    fingerbot:
+      name: Fingerbot
+      description: Tuya TS0001 Fingerbot (Zigbee2MQTT)
+      selector:
+        entity:
+          filter:
+            - domain: switch
+          multiple: false
+    steckdose:
+      name: Steckdose
+      description: Smart Plug mit Strommessung (NEO NAS-WR01B)
+      selector:
+        entity:
+          filter:
+            - domain: switch
+          multiple: false
+    power_sensor:
+      name: Leistungssensor
+      description: Power-Sensor der Steckdose (Watt)
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: power
+            - domain: sensor
+          multiple: false
+    status_boolean:
+      name: Status-Schalter (HomeKit)
+      description: >
+        input_boolean für HomeKit-Steuerung. In HA anlegen und in HomeKit exponieren.
+        Nicht die Steckdose direkt in HomeKit zeigen.
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+          multiple: false
+    power_schwellwert:
+      name: Leistungsschwellwert
+      description: Ab diesem Watt-Wert gilt die Maschine als eingeschaltet (Kompressor läuft)
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          unit_of_measurement: W
+    anlaufzeit:
+      name: Anlaufzeit
+      description: Wartezeit nach Strom einschalten, bevor der Fingerbot drückt
+      default: 10
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 1
+          unit_of_measurement: s
+    nachlaufzeit:
+      name: Nachlaufzeit
+      description: Wartezeit nach Aus-Druck, bevor die Steckdose den Strom abschaltet
+      default: 10
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 1
+          unit_of_measurement: s
+    power_stabilisierung:
+      name: Power-Stabilisierung (Touch)
+      description: Wartezeit nach physischem Touch, bevor der Power-Sensor ausgewertet wird
+      default: 10
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 1
+          unit_of_measurement: s
+
+variables:
+  fingerbot: !input fingerbot
+  steckdose: !input steckdose
+  power_sensor: !input power_sensor
+  status_boolean: !input status_boolean
+  power_schwellwert: !input power_schwellwert
+  anlaufzeit: !input anlaufzeit
+  nachlaufzeit: !input nachlaufzeit
+  power_stabilisierung: !input power_stabilisierung
+
+trigger:
+  - platform: state
+    entity_id: !input status_boolean
+    from: "off"
+    to: "on"
+    id: ein
+  - platform: state
+    entity_id: !input status_boolean
+    from: "on"
+    to: "off"
+    id: aus
+  - platform: state
+    entity_id: !input fingerbot
+    from: "off"
+    to: "on"
+    id: touch
+
+condition: []
+
+action:
+  - choose:
+      # --- Trigger A: HomeKit / App einschalten ---
+      - conditions:
+          - condition: trigger
+            id: ein
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ states(power_sensor) | float(0) > power_schwellwert }}
+                sequence: []
+            default:
+              - service: switch.turn_on
+                target:
+                  entity_id: !input steckdose
+              - delay:
+                  seconds: "{{ anlaufzeit | int }}"
+              - service: switch.turn_off
+                target:
+                  entity_id: !input fingerbot
+              - service: switch.turn_on
+                target:
+                  entity_id: !input fingerbot
+                data:
+                  on_time: 1
+
+      # --- Trigger B: HomeKit / App ausschalten ---
+      - conditions:
+          - condition: trigger
+            id: aus
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >-
+                      {{ states(power_sensor) | float(0) <= power_schwellwert }}
+                sequence:
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input steckdose
+            default:
+              - service: switch.turn_off
+                target:
+                  entity_id: !input fingerbot
+              - service: switch.turn_on
+                target:
+                  entity_id: !input fingerbot
+                data:
+                  on_time: 1
+              - delay:
+                  seconds: "{{ nachlaufzeit | int }}"
+              - service: switch.turn_off
+                target:
+                  entity_id: !input steckdose
+
+      # --- Trigger C: physischer Touch am Fingerbot ---
+      - conditions:
+          - condition: trigger
+            id: touch
+        sequence:
+          - choose:
+              # Steckdose aus: Touch ins Leere → Strom an, drücken, Status sync
+              - conditions:
+                  - condition: state
+                    entity_id: !input steckdose
+                    state: "off"
+                sequence:
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input steckdose
+                  - delay:
+                      seconds: "{{ anlaufzeit | int }}"
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input fingerbot
+                  - service: switch.turn_on
+                    target:
+                      entity_id: !input fingerbot
+                    data:
+                      on_time: 1
+                  - delay:
+                      seconds: "{{ power_stabilisierung | int }}"
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: >-
+                              {{ states(power_sensor) | float(0) > power_schwellwert }}
+                        sequence:
+                          - service: input_boolean.turn_on
+                            target:
+                              entity_id: !input status_boolean
+                    default:
+                      - service: input_boolean.turn_off
+                        target:
+                          entity_id: !input status_boolean
+
+            # Steckdose an: User hat physisch getoggelt → nur Status sync, kein zweiter Druck
+            default:
+              - delay:
+                  seconds: "{{ power_stabilisierung | int }}"
+              - choose:
+                  - conditions:
+                      - condition: template
+                        value_template: >-
+                          {{ states(power_sensor) | float(0) > power_schwellwert }}
+                    sequence:
+                      - service: input_boolean.turn_on
+                        target:
+                          entity_id: !input status_boolean
+                default:
+                  - service: input_boolean.turn_off
+                    target:
+                      entity_id: !input status_boolean
+                  - delay:
+                      seconds: "{{ nachlaufzeit | int }}"
+                  - service: switch.turn_off
+                    target:
+                      entity_id: !input steckdose
+
+mode: single
