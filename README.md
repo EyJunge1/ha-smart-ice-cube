@@ -1,6 +1,11 @@
-# Eiswürfelmaschine – Home Assistant Automation
+# HA Smart Ice Cube
 
-Automation-Blueprint für eine Eiswürfelmaschine mit:
+Home Assistant Automation-Blueprint für eine smarte Eiswürfelmaschine.
+
+**Blueprint-Datei:** [`blueprints/automation/ha-smart-ice-cube.yaml`](blueprints/automation/ha-smart-ice-cube.yaml)  
+**Repository:** [github.com/EyJunge1/ha-smart-ice-cube](https://github.com/EyJunge1/ha-smart-ice-cube)
+
+Hardware:
 
 - **NEO NAS-WR01B** Smart Plug (Strom + Leistungsmessung)
 - **Tuya TS0001_fingerbot** Fingerbot (Knopf drücken)
@@ -23,7 +28,7 @@ Der Power-Sensor erkennt, ob der Kompressor wirklich läuft (nicht nur ob Strom 
 
 ### 1. Blueprint nach Home Assistant kopieren
 
-Kopiere den Ordner `blueprints/` in dein HA-Konfigurationsverzeichnis:
+Kopiere die Blueprint-Datei in dein HA-Konfigurationsverzeichnis:
 
 ```text
 /config/blueprints/automation/ha-smart-ice-cube.yaml
@@ -31,13 +36,13 @@ Kopiere den Ordner `blueprints/` in dein HA-Konfigurationsverzeichnis:
 
 Danach: **Einstellungen → Automatisierungen & Szenen → Blueprints** → Blueprint neu laden (oder HA neu starten).
 
-Alternativ per Samba/SSH/VS Code Add-on in `config/blueprints/automation/` ablegen.
+Alternativ per Samba/SSH/VS Code Add-on in `config/blueprints/automation/` ablegen, oder den Ordner `blueprints/` aus diesem Repo kopieren.
 
 ### 2. Zigbee2MQTT – Geräte konfigurieren
 
-#### Steckdose (NEO NAS-WR01B)
+#### Smart Plug (NEO NAS-WR01B)
 
-In Zigbee2MQTT unter dem Gerät **Küche-Eiswürfelmaschine-Steckdose**:
+In Zigbee2MQTT unter deinem Smart-Plug-Gerät:
 
 | Parameter | Wert | Warum |
 |-----------|------|-------|
@@ -45,7 +50,7 @@ In Zigbee2MQTT unter dem Gerät **Küche-Eiswürfelmaschine-Steckdose**:
 
 #### Fingerbot (Tuya TS0001_fingerbot)
 
-Unter **Küche-Eiswürfelmaschine-Drücker**:
+Unter deinem Fingerbot-Gerät:
 
 | Parameter | Wert | Warum |
 |-----------|------|-------|
@@ -62,25 +67,27 @@ Optional (empfohlen):
 
 **Einstellungen → Geräte & Dienste → Helfer → Schalter erstellen**
 
-- Name: `Eiswürfelmaschine läuft`
-- Entity-ID: `input_boolean.eiswuerfelmaschine_laeuft` (oder ähnlich)
+- Name: `HA Smart Ice Cube`
+- Entity-ID (empfohlen): `input_boolean.ha_smart_ice_cube`
 
 Dieser Helfer ist die **einzige** Steuerung in HomeKit – nicht die Steckdose direkt exponieren.
 
 ### 4. Automation aus Blueprint erstellen
 
-**Einstellungen → Automatisierungen → Blueprint erstellen → „Eiswürfelmaschine“**
+**Einstellungen → Automatisierungen → Blueprint erstellen → „HA Smart Ice Cube“**
 
 | Blueprint-Input | Entity (Beispiel) |
 |-----------------|-------------------|
 | Fingerbot | `switch.0xa4c13845ef27b2ea` |
-| Steckdose | `switch.eiswurfelmaschine_steckdose` |
-| Leistungssensor | `sensor.eiswurfelmaschine_steckdose_power` |
-| Status-Schalter | `input_boolean.eiswuerfelmaschine_laeuft` |
+| Steckdose | `switch.ha_smart_ice_cube_plug` |
+| Leistungssensor | `sensor.ha_smart_ice_cube_power` |
+| Status-Schalter | `input_boolean.ha_smart_ice_cube` |
 | Leistungsschwellwert | `5` W (anpassen nach Messung) |
 | Anlaufzeit | `10` s |
 | Nachlaufzeit | `10` s |
 | Power-Stabilisierung | `10` s |
+
+Bestehende Entity-IDs (z. B. `switch.eiswurfelmaschine_steckdose`) können weiterverwendet werden – die Namen sind nur Vorschläge.
 
 ### 5. HomeKit
 
@@ -90,17 +97,14 @@ In der HomeKit-Bridge-Konfiguration (`configuration.yaml` oder UI) den `input_bo
 homekit:
   filter:
     include_entities:
-      - input_boolean.eiswuerfelmaschine_laeuft
+      - input_boolean.ha_smart_ice_cube
 ```
 
 Die **Steckdose nicht** in HomeKit zeigen – sonst kann Strom ohne sauberes Ausschalten abgeschaltet werden.
 
 ### 6. Alte Scripts entfernen
 
-Nach erfolgreichem Test können diese gelöscht werden:
-
-- `script.eiswurfelmaschine_drucken`
-- `script.eiswurfelmaschine_on_off`
+Nach erfolgreichem Test können alte Scripts gelöscht werden (z. B. `script.eiswurfelmaschine_drucken`, `script.eiswurfelmaschine_on_off`).
 
 ## Leistungsschwellwert kalibrieren
 
@@ -114,10 +118,11 @@ Nach erfolgreichem Test können diese gelöscht werden:
 
 | Problem | Lösung |
 |---------|--------|
+| Blueprint nicht sichtbar | Datei muss exakt `ha-smart-ice-cube.yaml` heißen und unter `config/blueprints/automation/` liegen |
 | Touch am Fingerbot löst nichts aus | `touch: ON` und `mode: click` in Z2M prüfen |
 | Fingerbot drückt doppelt | Blueprint nutzt `mode: single` – während einer Sequenz keine neuen Trigger |
-| `on_time` funktioniert nicht | In Z2M prüfen ob Firmware `on_time` unterstützt; ggf. in HA `switch.turn_on` → 1 s warten → `switch.turn_off` manuell testen |
-| HomeKit zeigt falschen Status | Nur `input_boolean` exponieren, nicht die Steckdose |
+| `on_time` funktioniert nicht | In Z2M prüfen ob Firmware `on_time` unterstützt; ggf. `switch.turn_on` → 1 s warten → `switch.turn_off` manuell testen |
+| HomeKit zeigt falschen Status | Nur `input_boolean.ha_smart_ice_cube` exponieren, nicht die Steckdose |
 | Maschine startet nach Stromausfall | `power_outage_memory: off` an der Steckdose setzen |
 
 ## Lizenz

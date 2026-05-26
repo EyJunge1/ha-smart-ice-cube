@@ -1,12 +1,12 @@
 blueprint:
   name: HA Smart Ice Cube
   description: >
-    Steuert eine Eiswürfelmaschine über Smart Plug, Power-Sensor und Fingerbot.
+    ha-smart-ice-cube – Steuert eine Eiswürfelmaschine über Smart Plug, Power-Sensor und Fingerbot.
     Ein-/Ausschalten via Home Assistant App, HomeKit (input_boolean) oder physischem
     Touch am Fingerbot. Der Power-Sensor erkennt den echten Maschinenstatus.
   domain: automation
   source_url: https://github.com/EyJunge1/ha-smart-ice-cube
-  author: Arne Leder
+  author: EyJunge1
   homeassistant:
     min_version: "2024.1.0"
   input:
