@@ -7,9 +7,9 @@ Home Assistant Automation-Blueprint für eine smarte Eiswürfelmaschine.
 
 Hardware:
 
-- **NEO NAS-WR01B** Smart Plug (Strom + Leistungsmessung)
+- **NEO NAS-WR01B** Smart Plug (Stromversorgung)
 - **Tuya TS0001_fingerbot** Fingerbot (Knopf drücken)
-- **input_boolean** für HomeKit-Steuerung
+- **input_boolean** für Steuerung, Status, HomeKit und HA-Dashboard
 
 Steuerung über Home Assistant App, Apple HomeKit oder physischen Touch am Fingerbot.
 
@@ -19,10 +19,11 @@ Steuerung über Home Assistant App, Apple HomeKit oder physischen Touch am Finge
 |----------|--------|
 | HomeKit/App: **Ein** | Strom an → warten → Fingerbot drückt Start-Knopf |
 | HomeKit/App: **Aus** | Fingerbot drückt Aus-Knopf → warten → Strom aus |
-| **Touch** (Steckdose aus) | Strom an → warten → drücken → Status sync |
-| **Touch** (Steckdose an) | Kein zweiter Druck – Power-Sensor prüft ob Maschine läuft, Status wird synchronisiert |
+| **Touch** (Boolean war an) | Maschine aus (Fingerbot hat gedrückt) → warten → Strom aus → Boolean aus |
+| **Touch** (Boolean aus, Steckdose aus) | Strom an → warten → drücken → Boolean an |
+| **Touch** (Boolean aus, Steckdose an) | Boolean an (Status-Sync) |
 
-Der Power-Sensor erkennt, ob der Kompressor wirklich läuft (nicht nur ob Strom an der Steckdose liegt).
+Der `input_boolean` ist die einzige Wahrheitsquelle für „an“ oder „aus“ – kein Power-Sensor nötig.
 
 ## Blueprint importieren (URL)
 
@@ -95,7 +96,7 @@ Optional (empfohlen):
 - Name: `HA Smart Ice Cube`
 - Entity-ID (empfohlen): `input_boolean.ha_smart_ice_cube`
 
-Dieser Helfer ist die **einzige** Steuerung in HomeKit – nicht die Steckdose direkt exponieren.
+Dieser Helfer ist **Steuerung und Status** in einem – für HomeKit, HA-App und Dashboard. Nicht die Steckdose direkt exponieren.
 
 ### 4. Automation aus Blueprint erstellen
 
@@ -104,15 +105,14 @@ Dieser Helfer ist die **einzige** Steuerung in HomeKit – nicht die Steckdose d
 | Blueprint-Input | Entity (Beispiel) |
 |-----------------|-------------------|
 | Fingerbot | `switch.0xa4c13845ef27b2ea` |
-| Steckdose | `switch.ha_smart_ice_cube_plug` |
-| Leistungssensor | `sensor.ha_smart_ice_cube_power` |
+| Steckdose | `switch.eiswurfelmaschine_steckdose` |
 | Status-Schalter | `input_boolean.ha_smart_ice_cube` |
-| Leistungsschwellwert | `5` W (anpassen nach Messung) |
 | Anlaufzeit | `10` s |
 | Nachlaufzeit | `10` s |
-| Power-Stabilisierung | `10` s |
 
-Bestehende Entity-IDs (z. B. `switch.eiswurfelmaschine_steckdose`) können weiterverwendet werden – die Namen sind nur Vorschläge.
+Bestehende Entity-IDs können weiterverwendet werden.
+
+Nach einem Blueprint-Update: Automation neu aus dem Blueprint anlegen oder fehlende Inputs in der UI anpassen (alte Power-Sensor-Felder entfallen).
 
 ### 5. HomeKit
 
@@ -131,19 +131,12 @@ Die **Steckdose nicht** in HomeKit zeigen – sonst kann Strom ohne sauberes Aus
 
 Nach erfolgreichem Test können alte Scripts gelöscht werden (z. B. `script.eiswurfelmaschine_drucken`, `script.eiswurfelmaschine_on_off`).
 
-## Leistungsschwellwert kalibrieren
-
-1. Maschine **aus** (Power-Button nicht gedrückt), Steckdose **an** → Power-Wert notieren (nur Standby/Display).
-2. Maschine **an** (Kompressor läuft) → Power-Wert notieren.
-3. Schwellwert zwischen beiden Werten setzen (z. B. 5 W, wenn Standby < 2 W und Betrieb > 20 W).
-
-**Hinweis:** Bei „Wasser leer“ kann der Kompressor weiterlaufen und hohe Leistung ziehen – die Automation erkennt das korrekt als „läuft“. Das ist gewollt.
-
 ## Fehlerbehebung
 
 | Problem | Lösung |
 |---------|--------|
 | Blueprint nicht sichtbar | Datei muss exakt `ha-smart-ice-cube.yaml` heißen und unter `config/blueprints/automation/` liegen |
+| Touch aus: Steckdose bleibt an | Blueprint neu importieren – alte Version nutzte Power-Sensor (verzögert/falsch) |
 | Touch am Fingerbot löst nichts aus | `touch: ON` und `mode: click` in Z2M prüfen |
 | Fingerbot drückt doppelt | Blueprint nutzt `mode: single` – während einer Sequenz keine neuen Trigger |
 | `on_time` funktioniert nicht | In Z2M prüfen ob Firmware `on_time` unterstützt; ggf. `switch.turn_on` → 1 s warten → `switch.turn_off` manuell testen |
