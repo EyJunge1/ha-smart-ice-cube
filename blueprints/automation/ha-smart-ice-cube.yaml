@@ -123,62 +123,59 @@ action:
             target:
               entity_id: !input steckdose
 
-      # --- Trigger C: physischer Touch am Fingerbot ---
       - conditions:
           - condition: trigger
             id: touch
+          - condition: state
+            entity_id: !input status_boolean
+            state: "on"
         sequence:
-          - choose:
-              # Boolean war an → User hat ausgeschaltet (Fingerbot hat schon gedrückt)
-              - conditions:
-                  - condition: state
-                    entity_id: !input status_boolean
-                    state: "on"
-                sequence:
-                  - delay:
-                      seconds: "{{ nachlaufzeit | int }}"
-                  - service: switch.turn_off
-                    target:
-                      entity_id: !input steckdose
-                  - service: input_boolean.turn_off
-                    target:
-                      entity_id: !input status_boolean
-              # Boolean aus + Steckdose aus → Touch ins Leere, einschalten
-              - conditions:
-                  - condition: state
-                    entity_id: !input status_boolean
-                    state: "off"
-                  - condition: state
-                    entity_id: !input steckdose
-                    state: "off"
-                sequence:
-                  - service: switch.turn_on
-                    target:
-                      entity_id: !input steckdose
-                  - delay:
-                      seconds: "{{ anlaufzeit | int }}"
-                  - service: switch.turn_off
-                    target:
-                      entity_id: !input fingerbot
-                  - service: switch.turn_on
-                    target:
-                      entity_id: !input fingerbot
-                    data:
-                      on_time: 1
-                  - service: input_boolean.turn_on
-                    target:
-                      entity_id: !input status_boolean
-              # Boolean aus + Steckdose an → Touch hat Maschine eingeschaltet, Status sync
-              - conditions:
-                  - condition: state
-                    entity_id: !input status_boolean
-                    state: "off"
-                  - condition: state
-                    entity_id: !input steckdose
-                    state: "on"
-                sequence:
-                  - service: input_boolean.turn_on
-                    target:
-                      entity_id: !input status_boolean
+          - delay:
+              seconds: "{{ nachlaufzeit | int }}"
+          - service: switch.turn_off
+            target:
+              entity_id: !input steckdose
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input status_boolean
+      - conditions:
+          - condition: trigger
+            id: touch
+          - condition: state
+            entity_id: !input status_boolean
+            state: "off"
+          - condition: state
+            entity_id: !input steckdose
+            state: "off"
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: !input steckdose
+          - delay:
+              seconds: "{{ anlaufzeit | int }}"
+          - service: switch.turn_off
+            target:
+              entity_id: !input fingerbot
+          - service: switch.turn_on
+            target:
+              entity_id: !input fingerbot
+            data:
+              on_time: 1
+          - service: input_boolean.turn_on
+            target:
+              entity_id: !input status_boolean
+      - conditions:
+          - condition: trigger
+            id: touch
+          - condition: state
+            entity_id: !input status_boolean
+            state: "off"
+          - condition: state
+            entity_id: !input steckdose
+            state: "on"
+        sequence:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: !input status_boolean
 
 mode: single
