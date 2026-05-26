@@ -5,7 +5,7 @@ blueprint:
     Ein-/Ausschalten via Home Assistant App, HomeKit (input_boolean) oder physischem
     Touch am Fingerbot. Der Power-Sensor erkennt den echten Maschinenstatus.
   domain: automation
-  source_url: https://github.com/EyJunge1/ha-smart-ice-cube
+  source_url: https://github.com/EyJunge1/ha-smart-ice-cube/blob/main/blueprints/automation/ha-smart-ice-cube.yaml
   author: EyJunge1
   homeassistant:
     min_version: "2024.1.0"
@@ -34,7 +34,6 @@ blueprint:
           filter:
             - domain: sensor
               device_class: power
-            - domain: sensor
           multiple: false
     status_boolean:
       name: Status-Schalter (HomeKit)
@@ -122,27 +121,23 @@ action:
       - conditions:
           - condition: trigger
             id: ein
+          - condition: template
+            value_template: >-
+              {{ states(power_sensor) | float(0) <= power_schwellwert | float(0) }}
         sequence:
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: >-
-                      {{ states(power_sensor) | float(0) > power_schwellwert }}
-                sequence: []
-            default:
-              - service: switch.turn_on
-                target:
-                  entity_id: !input steckdose
-              - delay:
-                  seconds: "{{ anlaufzeit | int }}"
-              - service: switch.turn_off
-                target:
-                  entity_id: !input fingerbot
-              - service: switch.turn_on
-                target:
-                  entity_id: !input fingerbot
-                data:
-                  on_time: 1
+          - service: switch.turn_on
+            target:
+              entity_id: !input steckdose
+          - delay:
+              seconds: "{{ anlaufzeit | int }}"
+          - service: switch.turn_off
+            target:
+              entity_id: !input fingerbot
+          - service: switch.turn_on
+            target:
+              entity_id: !input fingerbot
+            data:
+              on_time: 1
 
       # --- Trigger B: HomeKit / App ausschalten ---
       - conditions:
@@ -153,25 +148,25 @@ action:
               - conditions:
                   - condition: template
                     value_template: >-
-                      {{ states(power_sensor) | float(0) <= power_schwellwert }}
+                      {{ states(power_sensor) | float(0) <= power_schwellwert | float(0) }}
                 sequence:
                   - service: switch.turn_off
                     target:
                       entity_id: !input steckdose
-            default:
-              - service: switch.turn_off
-                target:
-                  entity_id: !input fingerbot
-              - service: switch.turn_on
-                target:
-                  entity_id: !input fingerbot
-                data:
-                  on_time: 1
-              - delay:
-                  seconds: "{{ nachlaufzeit | int }}"
-              - service: switch.turn_off
-                target:
-                  entity_id: !input steckdose
+              default:
+                - service: switch.turn_off
+                  target:
+                    entity_id: !input fingerbot
+                - service: switch.turn_on
+                  target:
+                    entity_id: !input fingerbot
+                  data:
+                    on_time: 1
+                - delay:
+                    seconds: "{{ nachlaufzeit | int }}"
+                - service: switch.turn_off
+                  target:
+                    entity_id: !input steckdose
 
       # --- Trigger C: physischer Touch am Fingerbot ---
       - conditions:
@@ -204,37 +199,37 @@ action:
                       - conditions:
                           - condition: template
                             value_template: >-
-                              {{ states(power_sensor) | float(0) > power_schwellwert }}
+                              {{ states(power_sensor) | float(0) > power_schwellwert | float(0) }}
                         sequence:
                           - service: input_boolean.turn_on
                             target:
                               entity_id: !input status_boolean
+                      default:
+                        - service: input_boolean.turn_off
+                          target:
+                            entity_id: !input status_boolean
+
+              # Steckdose an: physisch getoggelt → nur Status sync, kein zweiter Druck
+              default:
+                - delay:
+                    seconds: "{{ power_stabilisierung | int }}"
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: >-
+                            {{ states(power_sensor) | float(0) > power_schwellwert | float(0) }}
+                      sequence:
+                        - service: input_boolean.turn_on
+                          target:
+                            entity_id: !input status_boolean
                     default:
                       - service: input_boolean.turn_off
                         target:
                           entity_id: !input status_boolean
-
-            # Steckdose an: User hat physisch getoggelt → nur Status sync, kein zweiter Druck
-            default:
-              - delay:
-                  seconds: "{{ power_stabilisierung | int }}"
-              - choose:
-                  - conditions:
-                      - condition: template
-                        value_template: >-
-                          {{ states(power_sensor) | float(0) > power_schwellwert }}
-                    sequence:
-                      - service: input_boolean.turn_on
+                      - delay:
+                          seconds: "{{ nachlaufzeit | int }}"
+                      - service: switch.turn_off
                         target:
-                          entity_id: !input status_boolean
-                default:
-                  - service: input_boolean.turn_off
-                    target:
-                      entity_id: !input status_boolean
-                  - delay:
-                      seconds: "{{ nachlaufzeit | int }}"
-                  - service: switch.turn_off
-                    target:
-                      entity_id: !input steckdose
+                          entity_id: !input steckdose
 
 mode: single

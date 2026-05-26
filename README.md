@@ -24,6 +24,31 @@ Steuerung über Home Assistant App, Apple HomeKit oder physischen Touch am Finge
 
 Der Power-Sensor erkennt, ob der Kompressor wirklich läuft (nicht nur ob Strom an der Steckdose liegt).
 
+## Blueprint importieren (URL)
+
+**Falsch** (führt zu „Unknown error“):
+
+```text
+https://github.com/EyJunge1/ha-smart-ice-cube.git/blueprint/automations/ha-smart-ice-cube.yaml
+```
+
+**Richtig** – in HA unter *Einstellungen → Automatisierungen → Blueprints → Blueprint importieren*:
+
+```text
+https://github.com/EyJunge1/ha-smart-ice-cube/blob/main/blueprints/automation/ha-smart-ice-cube.yaml
+```
+
+Wichtig:
+
+- `blob/main` (nicht `.git`)
+- `blueprints/automation` (nicht `blueprint/automations`)
+
+**One-Click-Import** (My Home Assistant):
+
+[![Open your Home Assistant instance and show the blueprint import dialog.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FEyJunge1%2Fha-smart-ice-cube%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fha-smart-ice-cube.yaml)
+
+Alternativ die Datei manuell kopieren (siehe unten).
+
 ## Installation
 
 ### 1. Blueprint nach Home Assistant kopieren
